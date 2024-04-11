@@ -1,0 +1,28 @@
+{
+    "property_null": null,
+    "property_true": true,
+    "property_false": false,
+    "property_digit": 9,
+    "property_integer": 1000,
+    "property_decimal": 0.001,
+    "property_string": "string value",
+    "property_array": [
+        null,
+        true,
+        false,
+        9,
+        1234567890,
+        "string value"
+    ],
+    "property_object": {
+        "property_null": null,
+        "property_true": true,
+        "property_false": false,
+        "property_digit": 9,
+        "property_integer": 1000,
+        "property_decimal": 0.001,
+        "property_string": "string value",
+        "property_array": [],
+        "property_object": {}
+    }
+}

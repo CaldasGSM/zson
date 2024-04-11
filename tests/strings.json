@@ -1,0 +1,22 @@
+{
+    "space": " ",
+    "quote": "\"",
+    "backslash": "\\",
+    "controls": "\b\f\n\r\t",
+    "slash": "\/",
+    "alpha": "abcdefghijklmnopqrstuvwyz",
+    "ALPHA": "ABCDEFGHIJKLMNOPQRSTUVWYZ",
+    "digit": "0123456789",
+    "0123456789": "digit",
+    "special": "`1~!@#$%^&*()_+-={':[,]}|;.<>?",
+    "true": true,
+    "false": false,
+    "null": null,
+    "array": [],
+    "object": {},
+    "address": "50 St. James Street",
+    " s p a c e d ": " ",
+    "jsontext": "{\"object with 1 member\":[\"array with 1 element\"]}",
+    "quotes": "&#34; %22 0x22 034 &#x22;",
+    "\/\\\"\f\n\r\t`1~!@#$%^&*()_+-=[]{}|;:',.<>?": "A key can be any string"
+}
