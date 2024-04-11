@@ -6,7 +6,7 @@ Zero dynamic allocation JSON parser in C
 
 The purpose of this project is to implement a zero allocation JSON parser. Making it ideal for embedded systems or projects with tight memory requirements. 
 
-Unlike other libraries that claim to do zero allocations, but actually just implements a 'push parser' or a tokenizer (leaving the responsibility of allocation to the caller), this library actually implements a parser that does reinterpret the JSON text into a iterable structure, with native types and decoded data.  
+Unlike other libraries that claim to do zero allocations, but actually just implement a 'push parser' or a tokenizer (leaving the responsibility of allocation to the caller), this library actually implements a parser that does reinterpret the JSON text into a iterable structure, with native types and decoded data.  
 
 The library avoids heap allocations by parsing the JSON data into the same buffer that held the original JSON text, so it actually reuses the same memory space. This does mean the original data is destroyed, so if you want to keep the original text data, a manual copy of the buffer must be made before passing the buffer into the parser.
 
@@ -98,7 +98,7 @@ enumeration JsonType
 
 A structure that holds a parsed value, indicating it's type or `JsonTypeInvalid` if a parsing or enumeration error as occurred.
 
-if `JsonResult.Success` equals 0  The `Error` element will point to a string containing a description and `Index` will point to the index of teh input at which the parsing failed.
+if `JsonResult.Success` equals 0  The `Error` element will point to a string containing a description and `Index` will point to the index of the input at which the parsing failed.
 if `JsonResult.Success` is any other value the `InitialSize` and `EndSize` will have the start and end buffer sizes, which will give you an idea of the "compression" achieved 
 and `EndSize` can be used to allocate a new buffer for long time persistance.
 The `RootObject` will have the parsed value, the should be checked against its type before usage.
@@ -379,7 +379,7 @@ else if(oResult.RootObject.Type == JsonTypeObject)
     }
 }
 ```
-Short and simple code, I wish everything could be this simple, but honestly, this will probably blow up in your face 
+Short and simple code, I wish everything could be this simple, but honestly, this one will probably blow up in your face 
 ```c
 #include "json.h"
 
@@ -539,25 +539,25 @@ It takes up 5 bytes with the following information
 |   "|   f|   o|   o|   "|
 ```
 
-to turn it into a native null terminated string all we have to do is put a null after the last `o` of the string.
-It come in handy that there is a byte already there with a `"` that we don't need. so we can just change the memory 
+To turn it into a native null terminated string, all we have to do is put a null after the last `o` of the string.
+It comes in handy that, there is a byte already there with a `"` that we don't need. so we can just change the memory 
 content to be :
 
 ```
 |0x01|0x02|0x03|0x04|0x05|
 |   "|   f|   o|   o|  \0|
 ```
-And return a pointer to the address `0x02`, that will point to a valid null terminated c string.
-and since we are at it, there is a extra byte in the beginning of the string with another `"` 
-that as no purpose. We can use it to put a specific byte value to mark the beginning of a string.
-So the actual data in memory will become something like
+And returning a pointer to the address `0x02`, will point to a valid null terminated c string.
+And since we are at it, there is a extra byte in the beginning of the string with another `"` 
+that as no purpose. We can use it to put a specific byte value to "mark" the beginning of a string.
+So the actual data in memory will become something like:
 
 ```
 |0x01|0x02|0x03|0x04|0x05|
 | str|   f|   o|   o|  \0|
 ```
-Of course a string may need to be unescaped, but that works in our favour since it means it will occupy even less space.
-Here is another example for the string `"foo\nbar"`
+Of course a string may need to be unescaped, but that works in our favor since it means it will occupy even less space.
+Here is another example for the string `"foo\nbar"`:
 
 ```
         |0x01|0x02|0x03|0x04|0x05|0x06|0x07|0x08|0x09|0x0A|0x0B|0x0C|0x0D|0x0E|0x0F|
@@ -565,14 +565,14 @@ original|   "|   f|   o|   o|   \|   n|   b|   a|   r|   "|    |    |    |    | 
   parsed| str|   f|   o|   o|  \n|   b|   a|   r|  \0|    |    |    |    |    |    |
 ```
 
-the same happens for a JSON object that provide us with 2 extra bytes in the form of `{}` 
+The same happens for a JSON object, it provides us with 2 extra bytes in the form of `{}` 
 and the arrays in the form of `[]`
 
-Objects always consist of name/pais pairs, so their content can be parsed and iterated em pairs, 
+Objects always consist of name/value pairs, so their content can be parsed and iterated em pairs, 
 allowing us to not need any type of separator and discard the `:` and `,` characters
 
-And the same will happen for arrays until we reach the end of the array, every consecutive value is 
-an item of the array
+And the same thing happens for arrays, until we reach the end of the array, every consecutive value is 
+an item of the array:
 
 So an example of the object `{"foo":"bar"}` can be parsed like this:
 
@@ -592,9 +592,9 @@ original|   [|   "|   f|   o|   o|   "|   ,|   "|   b|   a|   r|   "|   ]|    | 
 
 #### literals
 
-Having understood the replacements done in memory, it becomes obvious that the literals `null`, `true` and `false`
-make our life even easier, because they provide us 4 and 5 bytes when all we need is single byte to place a "marker" 
-with a byte value that maps to the corresponding type, so here is a simple example os the JSON `[true,false,null]`:
+Having understood the replacements done in memory, it becomes obvious that for the literals `null`, `true` and `false`
+is even easier, because they provide us 4 and 5 bytes when all we need is single byte to place a "marker" 
+with a byte value that signals to the corresponding type, so here is a simple example os the JSON `[true,false,null]`:
 
 ```
         |0x01|0x02|0x03|0x04|0x05|0x06|0x07|0x08|0x09|0x0A|0x0B|0x0C|0x0D|0x0E|0x0F|0x10|0x11|
@@ -605,64 +605,65 @@ original|   [|   t|   r|   u|   e|   ,|   f|   a|   l|   s|   e|   ,|   n|   u| 
 #### numbers
 
 Here is where our real problem starts, unlike the scoped data there is not extra bytes for us to put our "marker", 
-and also unlike the literals there is not fixed size reserved space.
+and also unlike the literals there is not a fixed size used.
 
 There are easy situations like the number `1234` that occupies 4 bytes allowing us to store a 32bit int, 
-but that still leave situations like `9` where we have a single byte available, if we use it to put our number "marker" 
-we ill have no space for teh data, if we store the data we won't know how to interpret that data.
+but that still leaves situations like `9`, where we have a single byte available. If we use it to put our number "marker" 
+we will have no space for the data. If we store the data we won't know how to interpret that data without a "marker" signaling the type.
 
-But it we thing about that "marker" byte with its special values we can see that up until now 
-we have only defined a few unique values (7 to be exact), and to store 8 different values we only need 3 bits
-that leaves us 5 bit of the "marker" byte that we will never use, maybe, we can use those bits to store
+But if we thing about that "marker" byte and it's special values, we can see that up until now 
+we have only defined a few unique values (7 to be exact), and to store 8 different values we only need 3 bits.
+That leaves us 5 bits of the "marker" byte that we will never use, maybe, we can use those bits to store
 actual data.
 
-This will put us on the right track. Not only that, but fiddling with the "marker" bits we can take care of another problem...
+This puts us on the right track. Not only that, but fiddling with the "marker" bits we can take care of another problem...
 
 Lets take the JSON `["One","Two"]` for example.
 If we have a pointer to the start of the array, and we wish to get the item at position `1` (that being the second string).
-We need to "skip" the first item, but the only way to goto the end of a null terminated string is to read __all bytes__ until we get a `\0` 
-If we knew that the string had 3 characters, we could actually jump to its end, and fetch the following value. 
+We need to "skip" the first item, but the only way to go to the end of a null terminated string is to read __all bytes__ until we get a `\0`. 
+If we knew that the string occupied 3 bytes, we could actually jump to its end, and fetch the following value. 
 
-So if we are able to store the size of our objects it will make random access faster. 
+So if we are able to store the size of our objects, it will make random access faster. 
 Of course JSON allows for arbitrarily big strings, arrays or objects. 
 A 32bit int could handle all of that but we have no place to put it so a compromise must be made.
-We will store the size of small strings, arrays or object in the available bit of our "marker", 
+We will store the size of small strings, arrays or object in the available bits of our "marker", 
 and have a different value "marker" for the ones that need to be iterated to find the actual size.
 
 This leads us to our final version of our "marker" values, that are actually an encoding of flags and 
 data about the values that we have parsed.
 
 ```
-6bit size [0-63]	    0	1	JsonMarkerSmallString
-6bit size [0-63]        1	0	JsonMarkerSmallObject
-6bit size [0-63]        1	1	JsonMarkerSmallArray
-5bit int [0-31]	    1	0	0	JsonMarkerDecimal
-4bit int [0-15] 1	0	0	0	JsonMarkerDigit
-3bit [0-7]	1	0	0	0	0	JsonMarkerInt
-1	0	0	0	0	0	0	0	JsonMarkerLargeString
-1	0	1	0	0	0	0	0	JsonMarkerLargeObject
-1	1	0	0	0	0	0	0	JsonMarkerLargeArray
-1	1	1	0	0	0	0	0	JsonMarkerSequenceEnd
-0	0	1	0	0	0	0	0	JsonMarkerNull
-0	1	0	0	0	0	0	0	JsonMarkerTrue
-0	1	1	0	0	0	0	0	JsonMarkerFalse
-0	0	0	0	0	0	0	0	unused null
+6bit size [0-63]        0   1   JsonMarkerSmallString
+6bit size [0-63]        1   0   JsonMarkerSmallObject
+6bit size [0-63]        1   1   JsonMarkerSmallArray
+5bit int [0-31]     1   0   0   JsonMarkerDecimal
+4bit int [0-15] 1   0   0   0   JsonMarkerDigit
+3bit [0-7]  1   0   0   0   0   JsonMarkerInt
+1   0   0   0   0   0   0   0   JsonMarkerLargeString
+1   0   1   0   0   0   0   0   JsonMarkerLargeObject
+1   1   0   0   0   0   0   0   JsonMarkerLargeArray
+1   1   1   0   0   0   0   0   JsonMarkerSequenceEnd
+0   0   1   0   0   0   0   0   JsonMarkerNull
+0   1   0   0   0   0   0   0   JsonMarkerTrue
+0   1   1   0   0   0   0   0   JsonMarkerFalse
+0   0   0   0   0   0   0   0   unused null
 
 */
 ```
 
-If any of the first 2 bits of our "marker" are signaled we know we are dealing with a scope and we can
-use the other 6 bits to hold a value from 0 to 63 indicating the byte size of the scope. This allows us to easily skip small strings (and 63 bytes is nothing to be shameful of)
-which I bet will be 100% of the cases of the names of the properties of an object,
-and other small object like `{"x":123,"y":321}` that may occur in bulk.   
+If any of the first 2 bits of our "marker" are signaled, we know we are dealing with a scope and we can
+use the other 6 bits to hold a value from 0 to 63 indicating the byte size of the scope. 
+This allows us to easily skip small strings (and 63 bytes is nothing to be shameful of),
+which I bet will be 100% of the cases of the names of the properties of an object.
+And other small objects like `{"x":123,"y":321}` that may occur in bulk will also be easily skipped.
 
-If the first 2 bits are 0 then we check the next one, if signaled it means it will be followed by an integer
-but the decimal must be shifted n places. The n is stored in the nest 5 bits of teh maker, allowing us to have up to
-31 decimal places (not to bad). And if you are wondering if the have "space" to store this marker just remember that to define
+If the first 2 bits are 0, then we check the next one. If signaled it means it will be followed by an integer
+but the decimal must be shifted n places. The n is stored in the next 5 bits of the maker, allowing us to have up to
+15 decimal places. And if you are wondering if the have "space" to store this "marker", just remember that to define
 anything with a decimal place in JSON you need to put a `.` so an extra byte will always be available for the decimal marker.
 
-If the 3rd bit is also 0 we check the 4th bit if is 1 this is the marker for a single digit the next 
-4 bites allow us to have values from 16 which is more that enough to save values from '0' to '9', being these 
+If the 3rd bit is also 0 we check the 4th bit. If is 1, this is the marker for a single digit the next 
+4 bits allow us to have values from 0 to 16 which is more that enough to store values from '0' to '9', being these 
 the worst case cenarios for numbers.
 
 If the 4th bit is also 0 but the 5th is 1 we have in the remaining 3 bits a enumerator (with room to spare) that tells us the int size that follows 
@@ -674,20 +675,19 @@ If the 4th bit is also 0 but the 5th is 1 we have in the remaining 3 bits a enum
 And the bytes for that int are guaranteed by the digits placed in the JSON text, and we can check the worst case 
 cenarios to be sure.
 
-- `9` 1 byte special case in witch we use `JsonMarkerDigit`
-- `99` 2 bytes - use one to mark a 8bit int, second holds values from  -128 to 127 
-- `999` 3 bytes - use one to mark a 16bit int, second holds values from  -32768 to 32767
-- `9999` 4 bytes - use one to mark a 16bit int, second holds values from  -32768 to 32767
-- `99999` 5 bytes - use one to mark a 32bit int, second holds values from  -2147483648 to 2147483647
+- `9`     1 byte  - special case in witch we use `JsonMarkerDigit`
+- `99`    2 bytes - 1 byte "marker" to signal a 8bit int,  1 byte to store values from  -128 to 127 
+- `999`   3 bytes - 1 byte "marker" to signal a 16bit int, 2 bytes to store values from  -32768 to 32767
+- `9999`  4 bytes - 1 byte "marker" to signal a 16bit int, 2 bytes to store values from  -32768 to 32767
+- `99999` 5 bytes - 1 byte "marker" to signal a 32bit int, 4 bytes to store values from  -2147483648 to 2147483647
 - and so on...
 
 And if at any of these we add a `-` minus sign, we get even more space.
 
-Finally the combination of the last 3 bits of our marker gives us 8 combinations, that are just enough to
+Finally the combination of the last 3 bits of our marker, gives us 8 combinations that are just enough to
 define the markers we need for our other types of values.
 
->The all 0 combination was left unused on purpose, so mistakes are not made with the termination of string, or with the passed buffer.
-A 0 encountered will always mean error
+>The all 0 combination was left unused on purpose, so mistakes are not made with the termination of string, or with the passed buffer. A 0 encountered will always mean error.
 
 
 #### Final thoughts
