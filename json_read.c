@@ -780,3 +780,7 @@ JsonResult Json_Parse(char* pJson)
     }
     return  oResult;
 }
+JsonObject Json_Load(const char* pJson)
+{
+    return Json_LoadUnkown((byte*)pJson);
+}

@@ -35,6 +35,7 @@ typedef struct JsonResult
 } JsonResult;
 
 JsonResult Json_Parse(char* pJson);
+JsonObject Json_Load(const char* pJson);
 
 typedef struct JsonProperty
 {

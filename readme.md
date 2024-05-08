@@ -8,7 +8,7 @@ The purpose of this project is to implement a zero allocation JSON parser. Makin
 
 Unlike other libraries that claim to do zero allocations, but actually just implement a 'push parser' or a tokenizer (leaving the responsibility of allocation to the caller), this library actually implements a parser that does reinterpret the JSON text into a iterable structure, with native types and decoded data.  
 
-The library avoids heap allocations by parsing the JSON data into the same buffer that held the original JSON text, so it actually reuses the same memory space. This does mean the original data is destroyed, so if you want to keep the original text data, a manual copy of the buffer must be made before passing the buffer into the parser.
+The library avoids heap allocations by parsing the JSON data into the same buffer that held the original JSON text, so it actually reuses the same memory space. This does mean, the original data is destroyed, so if you want to keep the original text data, a copy of the buffer must be made before passing it into the parser.
 
 Many times, the resulting structure has a smaller size than the JSON text, so if there is need to persist the parsed information for long, a copy to a smaller buffer can be made (releasing the original 'larger' buffer).
 
@@ -43,7 +43,7 @@ else
 ```
 ## Parsing a json scalar
 
-Although JSON specification does not allow scalar values as root objects, the parser is still able to produce values for them
+Although JSON specification does not allow scalar values as root objects, the parser is still able to produce values for them.
 
 ```c 
 JsonResult oResult = Json_Parse("\"this is just a string\"");
@@ -69,11 +69,12 @@ Element|Description
 `struct JsonResult` | A structure returned by `Json_Parse` function, containing that parsing status, the error in case of failure or the root `JsonObject` in case of success  
 `struct JsonProperty` | A structure returned by the object enumeration functions that holds the name of the property and its value as a `JsonObject` 
 `struct JsonElement` |  A structure returned by the array enumeration functions that has its value as a `JsonObject`, and an index for the element.
-`JsonResult Json_Parse(char* pJson)` | Parses a JSON text into a serialized native structure,reusing the same buffer, this is a destructive operation, if the original data is needed a copy of the text data must be made before calling this function
+`JsonResult Json_Parse(char* pJson)` | Parses a JSON text into a serialized native structure, reusing the same buffer, this is a destructive operation, if the original data is needed a copy of the text data must be made before calling this function
+`JsonObject Json_Load(char* pJson)` | Loads a previously parsed buffer, for the cases where it has been persisted after parsing. 
 `JsonProperty Json_IterateProperties(JsonObject oJsonObject)` | Returns the first property of the given `JsonObject`, the given object  must be of type `JsonTypeObject`
 `JsonProperty Json_NextProperty(JsonProperty oJsonProperty)` | Returns the property following of the given `JsonProperty`, if the given property was the last one the returned `JsonProperty` will have its properties zeroed and the type of the value will be `JsonTypeInvalid`
 `JsonProperty Json_GetPropertyByName(JsonObject oJsonObject, char* pName)` | Iterates the object and retrieves a property of the given `JsonObject` that has the given name, if no such property is found the returned `JsonProperty` will have its properties zeroed and the type of the value will be `JsonTypeInvalid`
-`int Json_GetPropertyCount(JsonObject oJsonObject)` | Return the number of properties that the given `JsonObject` has
+`int Json_GetPropertyCount(JsonObject oJsonObject)` | Return the number of properties that the given `JsonObject` has, useful if you wish to copy values to another structure and you need the allocation size 
 `JsonElement Json_IterateElements(JsonObject oJsonArray)` | Returns the first value of the given JsonObject, the given object must be of type `JsonTypeArray`
 `JsonElement Json_NextElement(JsonElement oJsonElement)` | Returns the value following of the given `JsonElement`, if the given element was the last one the returned `JsonElement` will have its properties zeroed and the type of the value will be `JsonTypeInvalid`
 `JsonElement Json_GetElementAtIndex(JsonObject oJsonArray, int nIndex)` | Iterates the array and retrieves a value of the given `JsonObject` at the given property, if the index out of range the `JsonElement` will have its properties zeroed and the type of the value will be `JsonTypeInvalid`
@@ -99,9 +100,9 @@ enumeration JsonType
 A structure that holds a parsed value, indicating it's type or `JsonTypeInvalid` if a parsing or enumeration error as occurred.
 
 if `JsonResult.Success` equals 0  The `Error` element will point to a string containing a description and `Index` will point to the index of the input at which the parsing failed.
-if `JsonResult.Success` is any other value the `InitialSize` and `EndSize` will have the start and end buffer sizes, which will give you an idea of the "compression" achieved 
+if `JsonResult.Success` is any other value, the `InitialSize` and `EndSize` will have the initial string size and the final used size (remaining bytes to `InitialSize` will be zeroed) , which will give you an idea of the "compression" achieved 
 and `EndSize` can be used to allocate a new buffer for long time persistance.
-The `RootObject` will have the parsed value, the should be checked against its type before usage.
+The `RootObject` will have the parsed value, the object should be checked against its type before usage, making sure it is not `JsonTypeInvalid`.
 
 >After parsing the JSON text, the parser will fill the remaining buffer with `\0`
 ```c
@@ -120,9 +121,9 @@ struct JsonResult
 
 ### structure `JsonObject`
 
-This struct represents a json values ou json structure, JSON definition supports two types of structure.
-An object which is an ordered set of name/value pairs delimited by `{}`, or a ordered list of values delimited by `[]` 
-These types are set as  `JsonTypeObject` and `JsonTypeArray` respectively. In such case the `JsonObject` as no value and the iteration methods should be used
+This struct represents a json value or a json structure, JSON definition supports two types of structure.
+An object which is an unordered set of name/value pairs delimited by `{}`, or a ordered list of values delimited by `[]` 
+These types are set as  `JsonTypeObject` and `JsonTypeArray` respectively. In such case the `JsonObject` as no value and the iteration methods should be used.
 
 For other types, the other properties contain the parsed value, except `JsonTypeNull` that represents a literal null in the JSON, or `JsonTypeInvalid` that is used to represent failure. 
 
@@ -139,7 +140,7 @@ struct JsonObject
 
 ### structure `JsonProperty`
 
-This structure is return by `Json_IterateProperties` and `Json_GetPropertyByName`, it also must be passed to the `Json_NextProperty` for a continuation of the iteration
+This structure is return by `Json_IterateProperties` and `Json_GetPropertyByName`, it also must be passed to the `Json_NextProperty` for a continuation of the iteration.
 
 ```c
 struct JsonProperty
@@ -152,14 +153,14 @@ struct JsonProperty
 
 ### structure `JsonElement`
 
-This structure is return by `Json_IterateElements` and `Json_GetElementAtIndex`, it also must be passed to the `Json_NextElement` for a continuation of the iteration
+This structure is return by `Json_IterateElements` and `Json_GetElementAtIndex`, it also must be passed to the `Json_NextElement` for a continuation of the iteration.
 
 ```c
 struct JsonElement
 {
     char* Position      //used internally, by the iteration functions to locate a referenced object
     int Index           //index of the value in the parent array
-    JsonObject Value    //the value at the index value
+    JsonObject Value    //the value found at the index
 }
 ```
 
@@ -171,9 +172,9 @@ the text into the same buffer memory space.You must be aware that this is a dest
 
 The `JsonResult` is returned and used only by this function, to easily allow catch of parsing failures. 
 
-```c
-JsonResult Json_Parse(char* pJson);
-```
+>After parsing the JSON text, the parser will fill the remaining buffer with `\0`
+
+>This is a __destructive operation__, if the original data is needed, you must make a copy before calling this function.
 
 #### Usage
 ```c
@@ -185,7 +186,7 @@ if(oResult.Success)
 ### functions `Json_IterateProperties` & `Json_NextProperty`
 
 These functions can be used to "explore" JSON object with an unknown structure, by enumerating all of it's properties
-Their behavior and result is similar, the only  major difference being that `Json_IterateProperties` receives a `JsonObject` retrieves the first `JsonProperty`.
+Their behavior and result is similar, the only  major difference being that `Json_IterateProperties` receives a `JsonObject` and retrieves the first `JsonProperty`.
 While `Json_NextProperty` retrieves the next `JsonProperty` following the given one.
 
 
@@ -208,8 +209,9 @@ for (JsonProperty oProperty = Json_IterateProperties(oObject); oProperty.Value.T
 ### function `Json_GetPropertyByName`
 
 If the JSON data as a known structure you can use the `Json_GetPropertyByName` to access the property value directly.
-Be aware that if the property is optional or may not be present, the returned type should be validated to prevent errors 
+Be aware that if the property does not exist an object of type `JsonTypeInvalid`, so the returned type should be validated to prevent errors. 
 
+>Be aware that this operation is O(n)
 
 #### Usage
 ```c
@@ -229,6 +231,8 @@ This is just a helper function that returns the count of properties of a `JsonOb
 Since properties can't be get by index, there is not much use for this functions. but it may help if you need to make allocations proportional do the object "size".
 
 >If the JsonObject passed is not of type `JsonTypeObject` -1 is returned
+
+>Be aware that this operation is O(n)
 
 #### Usage
 ```c
@@ -379,7 +383,7 @@ else if(oResult.RootObject.Type == JsonTypeObject)
     }
 }
 ```
-Short and simple code, I wish everything could be this simple, but honestly, this one will probably blow up in your face 
+Short and simple code example, I wish everything could be this simple, but honestly, this one will probably blow up in your face because of the lack of validations 
 ```c
 #include "json.h"
 
@@ -452,29 +456,28 @@ if (oResult.Success && oResult.RootObject.Type != JsonTypeInvalid)
 
 ## Construction api
 Since many times parsing a JSON text also involves creating it, the library also includes functions to write a JSON text.
-In this case dynamic memory allocation is unavoidable, bit the allocation and reallocation of the buffer is managed by the library itself.
-The only remarkable thing about the way it is done, is that at every step the buffer contains a valid JSON text. This does mean a some extra memory copying is 
-done at every interaction. 
+In this case dynamic memory allocation is unavoidable, but the allocation and reallocation of the buffer is managed by the library itself.
+The only remarkable thing about the way it is done, is that at every step the buffer contains a valid JSON text. This does mean a some extra memory copying is done at every interaction. 
 
 > The construction functions receive a pointer to a pointer, because as they reallocate the buffer, the buffer address may change 
 
 Element|Description
 ---|---
-`char* Json_CreateBuffer()` | Allocates a buffer for the construction of the JSON text, it can be used wherever a string can be used. But it can't reallocated/freed by normal functions
-`void Json_ReleaseBuffer(char*)` | Releases the memory of a previous allocated buffer to the OS.
-`int Json_AddNull(char** pBuffer)` | Write a literal `null` value at the insertion point of the current scope
-`int Json_AddBool(char** pBuffer, int bValue)` | Adds a literal `true` or `false` value at the insertion point of the current scope
-`int Json_AddString(char** pBuffer, const char* sValue)` | Adds a literal `true` or `false` value at the insertion point of the current scope
-`int Json_AddNumber(char** pBuffer, double nValue)`  | Adds a number value at the insertion point of the current scope
-`int Json_AddArray(char** pBuffer)` | Opens a array scope at the current insertion point and moves the insertion point into the scope of the array
-`int Json_AddObject(char** pBuffer)` | Opens a object scope at the current insertion point and moves the insertion point into the scope of the array
-`int Json_AddPropertyNull(char** pBuffer, const char* sName)` | Write property with `null` value at the insertion point of the current object scope
-`int Json_AddPropertyBool(char** pBuffer, const char* sName, int bValue)` | Write property with `true` or `false` value at the insertion point of the current object scope
-`int Json_AddPropertyString(char** pBuffer, const char* sName, const char* sValue)` | Write property with a string value at the insertion point of the current object scope
-`int Json_AddPropertyNumber(char** pBuffer, const char* sName, double nValue)` | Write property with a number value at the insertion point of the current object scope
-`int Json_AddPropertyArray(char** pBuffer, const char* sName)` | Write a property with the value of an empty array and moves the insertion point into the scope of that array
-`int Json_AddPropertyObject(char** pBuffer, const char* sName)` | Write a property with the value of an empty object and moves the insertion point into the scope of that object
-`int Json_ExitScope(char** pBuffer)` | Moves the insertion pointer back to the parent scope
+`char* Json_CreateBuffer()` | Allocates a buffer for the construction of the JSON text, it can be used wherever a string can be used. But it can't reallocated/freed by normal functions.
+`void Json_ReleaseBuffer(char*)` | Releases the memory of a previous allocated buffer.
+`int Json_AddNull(char** pBuffer)` | Write a literal `null` value at the insertion point of the current `array` scope
+`int Json_AddBool(char** pBuffer, int bValue)` | Adds a literal `true` or `false` value at the insertion point of the current `array` scope
+`int Json_AddString(char** pBuffer, const char* sValue)` | Adds a string value at the insertion point of the current `array` scope
+`int Json_AddNumber(char** pBuffer, double nValue)`  | Adds a number value at the insertion point of the current `array` scope
+`int Json_AddArray(char** pBuffer)` | Opens a array scope at the current insertion point of an `array` and moves the insertion point __into__ the scope of the newly created array
+`int Json_AddObject(char** pBuffer)` | Opens a object scope at the current insertion point of an `array` and moves the insertion point __into__ the scope of the newly created object
+`int Json_AddPropertyNull(char** pBuffer, const char* sName)` | Write property with `null` value at the insertion point of the current `object` scope
+`int Json_AddPropertyBool(char** pBuffer, const char* sName, int bValue)` | Write property with `true` or `false` value at the insertion point of the current `object` scope
+`int Json_AddPropertyString(char** pBuffer, const char* sName, const char* sValue)` | Write property with a string value at the insertion point of the current `object` scope
+`int Json_AddPropertyNumber(char** pBuffer, const char* sName, double nValue)` | Write property with a number value at the insertion point of the current `object` scope
+`int Json_AddPropertyArray(char** pBuffer, const char* sName)` | Write a property with the value of an empty array at the current insertion point of an `object`, and moves the insertion point __into__ the scope of the newly created array
+`int Json_AddPropertyObject(char** pBuffer, const char* sName)` | Write a property with the value of an empty object at the current insertion point of an `object`, and moves the insertion point __into__ the scope of the newly created object
+`int Json_ExitScope(char** pBuffer)` | Moves the insertion pointer __back__ to the parent scope,
 `const char* Json_GetError(char* pBuffer)` | Returns the error message in the case that any of the previous functions have returned `0`
 `char* Json_Indent(char*)` | Returns a __allocated__ buffer with a indented version of the passes JSON text.(__the buffer must be de-allocated with free()__)
 `char* Json_Compress(char* pChar)` | Removes non significant white-spaces from the JSON text(The modification is done in place)
@@ -489,22 +492,22 @@ Json_AddArray(&pBuffer);
 {
     Json_AddObject(&pBuffer);//this opens a new scope and moves the insertion point to that scope
     {
-        //so now we are adding properties to the previous object
+        //so now we are adding properties to the object
         Json_AddPropertyNull(&pBuffer, "null_property");
         Json_AddPropertyBool(&pBuffer, "bool_property", 1);
         Json_AddPropertyString(&pBuffer, "string_property", "foo\nbar");
         Json_AddPropertyNumber(&pBuffer, "number_property", -111.222);
-        Json_AddPropertyObject(&pBuffer, "child_object");
+        Json_AddPropertyObject(&pBuffer, "child_object");//opens a new scope for child object
         {
-            Json_AddPropertyArray(&pBuffer, "empty_array");
-            Json_ExitScope(&pBuffer);//exit the newly created array scope
+            Json_AddPropertyArray(&pBuffer, "empty_array");//opens a new scope for an array
+            Json_ExitScope(&pBuffer);//exit the newly created array scope (leaving it empty)
         }
-        Json_ExitScope(&pBuffer);
+        Json_ExitScope(&pBuffer);//exit the child object scope
         Json_AddPropertyString(&pBuffer, "parent_scope", "after the child object");
-        
     }
-    Json_ExitScope(&pBuffer);
-    //back to the root array
+    Json_ExitScope(&pBuffer);//exits the object scope, meaning we return to the array scope
+    
+    //these are added to the array
     Json_AddNull(&pBuffer);
     Json_AddBool(&pBuffer, 0);
     Json_AddString(&pBuffer, "hello world");
@@ -519,8 +522,9 @@ char* pPretty = Json_Indent(pBuffer);
 //and here it is formatted and indented
 printf("%s", pBuffer);
 
-
+//the formatted version must be released with "free" 
 free(pPretty)
+//construction buffer CANT be used with "free",  `Json_ReleaseBuffer` MUST be used
 Json_ReleaseBuffer(pBuffer);
 
 
@@ -540,15 +544,14 @@ It takes up 5 bytes with the following information
 ```
 
 To turn it into a native null terminated string, all we have to do is put a null after the last `o` of the string.
-It comes in handy that, there is a byte already there with a `"` that we don't need. so we can just change the memory 
-content to be :
+But there is a byte already there with a `"` that we don't need. So we can just change the memory content to be :
 
 ```
 |0x01|0x02|0x03|0x04|0x05|
 |   "|   f|   o|   o|  \0|
 ```
-And returning a pointer to the address `0x02`, will point to a valid null terminated c string.
-And since we are at it, there is a extra byte in the beginning of the string with another `"` 
+Now, returning a pointer to the address `0x02`, will point to a valid null terminated c string.
+And since we are reusing bytes, there is a extra byte in the beginning of the string with another `"` 
 that as no purpose. We can use it to put a specific byte value to "mark" the beginning of a string.
 So the actual data in memory will become something like:
 
@@ -581,7 +584,7 @@ So an example of the object `{"foo":"bar"}` can be parsed like this:
 original|   {|   "|   f|   o|   o|   "|   :|   "|   b|   a|   r|   "|   }|    |    |
   parsed| obj| str|   f|   o|   o|  \0| str|   b|   a|   r|  \0| end|    |    |    |
 ```
-While an array like `["foo","bar"]` will be very similar the diference will be only in the type "marker"
+While an array like `["foo","bar"]` will be very similar the difference will be only in the type "marker"
 and out we end up iterating the data:
 
 ```
@@ -592,9 +595,8 @@ original|   [|   "|   f|   o|   o|   "|   ,|   "|   b|   a|   r|   "|   ]|    | 
 
 #### literals
 
-Having understood the replacements done in memory, it becomes obvious that for the literals `null`, `true` and `false`
-is even easier, because they provide us 4 and 5 bytes when all we need is single byte to place a "marker" 
-with a byte value that signals to the corresponding type, so here is a simple example os the JSON `[true,false,null]`:
+Having understood the replacements done in memory, it becomes obvious that for the literals `null`, `true` and `false` is even easier, because they provide us 4 and 5 bytes when all we need is single byte to place a "marker" 
+with a byte value that signals the corresponding type. So here is a simple example of the JSON `[true,false,null]`:
 
 ```
         |0x01|0x02|0x03|0x04|0x05|0x06|0x07|0x08|0x09|0x0A|0x0B|0x0C|0x0D|0x0E|0x0F|0x10|0x11|
@@ -604,24 +606,23 @@ original|   [|   t|   r|   u|   e|   ,|   f|   a|   l|   s|   e|   ,|   n|   u| 
 
 #### numbers
 
-Here is where our real problem starts, unlike the scoped data there is not extra bytes for us to put our "marker", 
-and also unlike the literals there is not a fixed size used.
+Here is where he hit a bump, unlike the scoped data there are no extra bytes for us to put our "marker", 
+and also unlike the literals there is no fixed size used.
 
 There are easy situations like the number `1234` that occupies 4 bytes allowing us to store a 32bit int, 
-but that still leaves situations like `9`, where we have a single byte available. If we use it to put our number "marker" 
-we will have no space for the data. If we store the data we won't know how to interpret that data without a "marker" signaling the type.
+but that still leaves situations like `9`, where we have a single byte available. If we use it to put our number "marker", we will have no space for the data. If we store the data, we won't know how to interpret that data without a "marker" signaling the type.
 
-But if we thing about that "marker" byte and it's special values, we can see that up until now 
+But if we thing about that "marker" byte and it's values, we can see that up until now 
 we have only defined a few unique values (7 to be exact), and to store 8 different values we only need 3 bits.
-That leaves us 5 bits of the "marker" byte that we will never use, maybe, we can use those bits to store
+That leaves us 5 bits of the "marker" byte that we will never use, maybe we can use those bits to store
 actual data.
 
 This puts us on the right track. Not only that, but fiddling with the "marker" bits we can take care of another problem...
 
-Lets take the JSON `["One","Two"]` for example.
+Lets take the JSON `["One","Two","Three"]` for example.
 If we have a pointer to the start of the array, and we wish to get the item at position `1` (that being the second string).
-We need to "skip" the first item, but the only way to go to the end of a null terminated string is to read __all bytes__ until we get a `\0`. 
-If we knew that the string occupied 3 bytes, we could actually jump to its end, and fetch the following value. 
+We need to "skip" the first item, but the only way to go to the end of a null terminated string is to read __all bytes__ until we get to a `\0`. 
+If we knew the size of the string, we could actually jump to its end, and fetch the following value. 
 
 So if we are able to store the size of our objects, it will make random access faster. 
 Of course JSON allows for arbitrarily big strings, arrays or objects. 
@@ -629,10 +630,12 @@ A 32bit int could handle all of that but we have no place to put it so a comprom
 We will store the size of small strings, arrays or object in the available bits of our "marker", 
 and have a different value "marker" for the ones that need to be iterated to find the actual size.
 
-This leads us to our final version of our "marker" values, that are actually an encoding of flags and 
+This leads us to the final version of our "marker" values, that are actually an encoding of flags and 
 data about the values that we have parsed.
 
 ```
+8   7   6   5   4   3   2   1
+-----------------------------   
 6bit size [0-63]        0   1   JsonMarkerSmallString
 6bit size [0-63]        1   0   JsonMarkerSmallObject
 6bit size [0-63]        1   1   JsonMarkerSmallArray
@@ -647,38 +650,34 @@ data about the values that we have parsed.
 0   1   0   0   0   0   0   0   JsonMarkerTrue
 0   1   1   0   0   0   0   0   JsonMarkerFalse
 0   0   0   0   0   0   0   0   unused null
-
-*/
 ```
 
 If any of the first 2 bits of our "marker" are signaled, we know we are dealing with a scope and we can
 use the other 6 bits to hold a value from 0 to 63 indicating the byte size of the scope. 
-This allows us to easily skip small strings (and 63 bytes is nothing to be shameful of),
-which I bet will be 100% of the cases of the names of the properties of an object.
+This allows us to easily skip small strings, which I bet will be 100% of the cases of the names of the properties of an object.
 And other small objects like `{"x":123,"y":321}` that may occur in bulk will also be easily skipped.
 
 If the first 2 bits are 0, then we check the next one. If signaled it means it will be followed by an integer
-but the decimal must be shifted n places. The n is stored in the next 5 bits of the maker, allowing us to have up to
-15 decimal places. And if you are wondering if the have "space" to store this "marker", just remember that to define
+but the decimal must be shifted `n` places. The `n` is stored in the next 5 bits of the maker, allowing us to have up to 15 decimal places. And if you are wondering if the have "space" to store this "marker", just remember that to define
 anything with a decimal place in JSON you need to put a `.` so an extra byte will always be available for the decimal marker.
 
-If the 3rd bit is also 0 we check the 4th bit. If is 1, this is the marker for a single digit the next 
+If the 3rd bit is also 0 we check the 4th bit. If is 1, this is the marker for a single digit and the next 
 4 bits allow us to have values from 0 to 16 which is more that enough to store values from '0' to '9', being these 
-the worst case cenarios for numbers.
+the worst case scenario for numbers.
 
-If the 4th bit is also 0 but the 5th is 1 we have in the remaining 3 bits a enumerator (with room to spare) that tells us the int size that follows 
+If the 4th bit is also 0 but the 5th is 1 we have in the remaining 3 bits a enumerator that tells us the size of the int that follows 
 - 1 = 8bit signed int
 - 2 = 16bit signed int
 - 3 = 32bit signed int
 - 4 = 64bit signed int
 
 And the bytes for that int are guaranteed by the digits placed in the JSON text, and we can check the worst case 
-cenarios to be sure.
+scenarios to be sure.
 
 - `9`     1 byte  - special case in witch we use `JsonMarkerDigit`
 - `99`    2 bytes - 1 byte "marker" to signal a 8bit int,  1 byte to store values from  -128 to 127 
 - `999`   3 bytes - 1 byte "marker" to signal a 16bit int, 2 bytes to store values from  -32768 to 32767
-- `9999`  4 bytes - 1 byte "marker" to signal a 16bit int, 2 bytes to store values from  -32768 to 32767
+- `9999`  4 bytes - 1 byte "marker" to signal a 16bit int, 2 bytes to store values from  -32768 to 32767 (saves 1 byte)
 - `99999` 5 bytes - 1 byte "marker" to signal a 32bit int, 4 bytes to store values from  -2147483648 to 2147483647
 - and so on...
 
@@ -693,10 +692,10 @@ define the markers we need for our other types of values.
 #### Final thoughts
 
 This technic and encoding was created by myself without any inspiration from other sources. This does not mean
-I think it is unique or novel. There are many smart people out there, I wouldn't be surprized if some
-other algorithm used a similar encoding technic. Any way, I think that this code can be of use for project that
-have very tight memory requirements, as is as a very small memory footprint, while not compromising performance too much. 
+I think it is unique or novel. There are many smart people out there, I wouldn't be surprised if some
+other algorithm used a similar encoding technic. Anyway, I think that this code can be of use for projects that
+have very tight memory requirements, this as a very small memory footprint, while not compromising performance too much. 
 
-The code is provided AS IS, you can use it as you wish. (just don't blame me if you take down the internet)
+The code is provided AS IS, you can use it as you wish.
 
 Happy coding.
